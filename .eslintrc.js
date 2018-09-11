@@ -26,5 +26,6 @@ module.exports = {
     "max-len": ["warn", {"code": 500}],
     // space
     "space-before-function-paren": ["warn", "never"],
+    "no-multi-spaces": ['warn', { ignoreEOLComments: true }]
   }
 }

@@ -23,7 +23,6 @@ function decodeUTF8(uint8Array) {
   const length = uint8Array.length;
 
   while (i < length) {
-    console.log('input ', i, "is ", input[i], 'which is ', input[i].toString(16));
     if (input[i] < 0x80) {
       // 单字节: 0x80 ~ 0x7F
       out.push(String.fromCharCode(input[i]));
@@ -46,7 +45,6 @@ function decodeUTF8(uint8Array) {
       // 0xE0 ~ 0xEF, 首字节"1110xxxx"
       // 三字节utf-8
       if (checkContinuation(input, i, 2)) {
-
         const ucs4 = (input[i] & 0x0F) << 12 | (input[i + 1] & 0x3F) << 6 | input[i + 2] & 0x3F;
         console.log('3字节!', ucs4);
         // 基本定义范围：0~FFFF
