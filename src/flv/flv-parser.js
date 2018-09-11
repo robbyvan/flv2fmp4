@@ -1,4 +1,5 @@
 import FlvPacket from './flv-packet';
+import AmfParser from './flv-amfParser';
 
 class FlvParser {
   constructor() {
@@ -19,6 +20,13 @@ class FlvParser {
     this.tempUint8 = uint8;
     this.parseFlv();
     console.log(this);
+    const meta = this.arrPackets[0];
+    const uint8Arr = new Uint8Array(meta.payload);
+    const buffer = uint8Arr.buffer;
+    console.log('===');
+    console.log('buffer is', buffer);
+    console.log('===');
+    AmfParser.parseMetaData(buffer, 0, meta.payloadSize);
   }
 
   /**
@@ -57,10 +65,10 @@ class FlvParser {
     while (this.index < this.tempUint8.length) {
       const p = new FlvPacket();
       p.packetType = this.read(1).slice(0)[0];
-      p.payloadSize = this.read(3).slice(0);
+      p.payloadSize = this._getPayloadSize(this.read(3).slice(0));
       p.timestamp = this.read(4).slice(0);
       p.streamID = this.read(3).slice(0);
-      p.payload = this.read(this._getPayloadSize(p.payloadSize)).slice(0);
+      p.payload = this.read(p.payloadSize).slice(0);
 
       this.arrPackets.push(p);
       this.read(4); // 下一个"prev packet size"

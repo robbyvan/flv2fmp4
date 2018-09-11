@@ -8,12 +8,8 @@ let le = (function() {
     return (new Int16Array(buf))[0] === 256; // platform-spec read, if equal then LE
 })();
 
-class FlvDemux {
-  constructor() {
-
-  }
-
-  static ParseString(arrayBuffer, dataOffset, dataSize) {
+class AmfParser {
+  static parseString(arrayBuffer, dataOffset, dataSize) {
     if (dataSize < 2) {
       // 至少一个length + payload
       throw new IllegalStateException('Data not enough when parse String');
@@ -39,8 +35,10 @@ class FlvDemux {
       // 至少一个UI24(end)
       throw new IllegalStateException('Data not enough when parse ScriptDataObject');
     }
-    const name = FlvDemux.parsrString(arrayBuffer, dataOffset, dataSize);
-    const value = FlvDemux.parseScript(arrayBuffer, dataOffset + name.size);
+    const name = AmfParser.parseString(arrayBuffer, dataOffset, dataSize);
+    console.log('key?', name);
+    const value = AmfParser.parseScript(arrayBuffer, dataOffset + name.size, dataSize - name.size);
+    console.log('value?', value);
     const isObjectEnd = value.objectEnd;
 
     return {
@@ -48,13 +46,13 @@ class FlvDemux {
         name: name.data,
         value: value.data,
       },
-      size: value.size,
+      size: name.size + value.size,
       objectEnd: isObjectEnd
     };
   }
 
   static parseVariable(arrayBuffer, dataOffset, dataSize) {
-    return FlvDemux.parseObject(arrayBuffer, dataOffset, dataSize);
+    return AmfParser.parseObject(arrayBuffer, dataOffset, dataSize);
   }
 
   static parseDate(arrayBuffer, dataOffset, dataSize) {
@@ -77,16 +75,18 @@ class FlvDemux {
 
 
   // parse MetaData
-  static parseMetaData(arr) {
+  static parseMetaData(arrayBuffer, dataOffset, dataSize) {
     let data = {};
-    try {
-      const name = FlvDemux.parseScript(arr, 0);
-      const value = FlvDemux.parseScript(arr, name.size, arr.length - name.size);
+    // try {
+      const name = AmfParser.parseScript(arrayBuffer, dataOffset, dataSize);
+      console.log('parse name', name);
+      const value = AmfParser.parseScript(arrayBuffer, dataOffset + name.size, dataSize - name.size);
+      console.log('parse value', value);
 
-      data[name.data] = value.data;
-    } catch(e) {
-      console.log('FlvDemux Error: ', e);
-    }
+      // data[name.data] = value.data;
+    // } catch(e) {
+      // console.log('AmfParser Error: ', e);
+    // }
   }
 
   static parseScript(arrayBuffer, dataOffset, dataSize) {
@@ -99,7 +99,10 @@ class FlvDemux {
     let value;
     let objectEnd = false;
 
-    const type = dv.getUint8(dataOffset); // 第一个byte表示AMFpacket的类型, (8位没有LE/BE概念)
+    const type = dv.getUint8(0); // 第一个byte表示AMFpacket的类型, (8位没有LE/BE概念)
+
+    console.log('type is :', type, "dataOffset is ", dataOffset);
+
     let offset = 1; // 读取了类型:UI8, 一个byte
 
     /** AMF(action message format) packet 类型
@@ -117,11 +120,11 @@ class FlvDemux {
     * 11 = Date 
     * 12 = Long string
     */
-    try {
+    // try {
       switch (type) {
         case 0: {
           // 0 - Number: DOUBLE
-          value = dv.getFloat64(1, !le);
+          value = dv.getFloat64(offset, !le);
           offset += 8;
           break;
         }
@@ -136,7 +139,7 @@ class FlvDemux {
 
         case 2: {
           // 2 - String: SCRIPTDATASTRING: { UI16 + STRING }
-          const amfStr = FlvDemux.parseString(buffer, dataOffset + 1, dataSize - 1);
+          const amfStr = AmfParser.parseString(arrayBuffer, dataOffset + offset, dataSize - 1);
           value = amfStr.data;
           offset += amfStr.size;
           break;
@@ -158,21 +161,22 @@ class FlvDemux {
 
           while (offset < dataSize - 4) {
             // why 4? 4 === type(UI8) + ScriptDataObjectEnd(UI24)
-            const amfObj = FlvDemux.parseObject(buffer, dataOffset + offset, dataSize - offset - terminal);
+            const amfObj = AmfParser.parseObject(arrayBuffer, dataOffset + offset, dataSize - offset - terminal);
 
             if (amfObj.objectEnd) {
               break;
             }
 
             value[amfObj.data.name] = amfObj.data.value;
-            dataOffset = amfObj.size; // 这里不是+=, 因为dataOffset已经在parse的时候更新(+=)过了
+            dataOffset += amfObj.size;
           }
 
           if (offset <= dataSize - 3) {
             // why not dataSize - 4?
-            const marker = v.getUint32(offset - 1, !le) & 0x00FFFFFF;
+            const marker = dv.getUint32(offset - 1, !le) & 0x00FFFFFF;
             if (marker === 9) {
               offset += 3;
+              objectEnd = true;
             }
           }
           break;
@@ -193,20 +197,21 @@ class FlvDemux {
 
           while (offset < dataSize - 8) {
             // why 8? 8 === type(UI8) + ECMAArrayLength(UI32) + ScriptDataVariableEnd(UI24)
-            const amfVar = FlvDemux.parseVariable(buffer, dataOffset + offset, dataSize - offset - terminal);
-
+            const amfVar = AmfParser.parseVariable(arrayBuffer, dataOffset + offset, dataSize - offset - terminal);
+            
             if (amfVar.objectEnd) {
               break;
             }
             value[amfVar.data.name] = amfVar.data.value;
-            offset = amfVar.size;
+            offset += amfVar.size;
           }
 
           if (offset <= dataSize - 3) {
               // why not dataSize - 4?
-              const marker = v.getUint32(offset - 1, !le) & 0x00FFFFFF;
+              const marker = dv.getUint32(offset - 1, !le) & 0x00FFFFFF;
               if (marker === 9) {
                 offset += 3;
+                objectEnd = true;
               }
             }
 
@@ -231,7 +236,7 @@ class FlvDemux {
           const stricArrayLength = dv.getUint32(1, !le);
           offset += 4; // UI32, number of items in array
           for (let i = 0; i < stricArrayLength; ++i) {
-            let val = FlvDemux.parseScript(arrayBuffer, dataOffset + offset, dataSize - offset);
+            let val = AmfParser.parseScript(arrayBuffer, dataOffset + offset, dataSize - offset);
             value.push(val.data);
             offset += val.size;
           }
@@ -241,7 +246,7 @@ class FlvDemux {
 
         case 11: {
           // 11 - Date type: SCRIPTDATADATE = { DateTime: DOUBLE +  LocalDateTimeOffset: SI16 }
-          const date = flvDemux.parseDate(parseString, dataOffset + 1, dataSize - 1);
+          const date = AmfParser.parseDate(parseString, dataOffset + 1, dataSize - 1);
           value = date.data;
           dataOffset += date.size;
 
@@ -250,7 +255,7 @@ class FlvDemux {
 
         case 12: {
           // 12 -  Long string type: SCRIPTDATALONGSTRING = { StringLength: UI32, StringData: STRING }
-          const amfLongStr = FlvDemux.parseString(arrayBuffer, dataOffset + 1, dataSize - 1);
+          const amfLongStr = AmfParser.parseString(arrayBuffer, dataOffset + 1, dataSize - 1);
           value = amfLongStr.data;
           offset += amfLongStr.size;
 
@@ -262,16 +267,16 @@ class FlvDemux {
           dataOffset = dataSize;
           console.log('AMF', 'Unsupported AMF value type: ', type);
       }
-    } catch(e) {
-       console.log('FlvDemux Error:', e.toString());
-    }
+    // } catch(e) {
+       // console.log('AmfParser Error:', e.toString());
+    // }
     return {
       data: value,
-      size: dataOffset,
+      size: offset,
       objectEnd: objectEnd
     };
   }
 
 }
 
-export default FlvDemux;
+export default AmfParser;
