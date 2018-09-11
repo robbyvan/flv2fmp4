@@ -1,5 +1,4 @@
 import DropBox from './components/dropbox/dropbox';
-import './player.js';
 
 const body = document.querySelector('body');
 const boxContainer = document.createElement('div');

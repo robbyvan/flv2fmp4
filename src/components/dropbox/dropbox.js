@@ -1,4 +1,5 @@
 import './style.scss';
+import FlvParser from '../../flv/flv-parser';
 
 class DropBox {
   constructor() {
@@ -10,7 +11,8 @@ class DropBox {
   _processFlv(e) {
     const buffer = e.target.result;
     const uint8 = new Uint8Array(buffer);
-    console.log(uint8);
+    const flvParse = new FlvParser();
+    flvParse.setFlv(uint8);
   }
 
   _handleFileDrop(e) {
