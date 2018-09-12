@@ -36,9 +36,9 @@ class AmfParser {
       throw new IllegalStateException('Data not enough when parse ScriptDataObject');
     }
     const name = AmfParser.parseString(arrayBuffer, dataOffset, dataSize);
-    console.log('key?', name);
+    // console.log('key?', name);
     const value = AmfParser.parseScript(arrayBuffer, dataOffset + name.size, dataSize - name.size);
-    console.log('value?', value);
+    // console.log('value?', value);
     const isObjectEnd = value.objectEnd;
 
     return {
@@ -77,16 +77,18 @@ class AmfParser {
   // parse MetaData
   static parseMetaData(arrayBuffer, dataOffset, dataSize) {
     let data = {};
-    // try {
+    try {
       const name = AmfParser.parseScript(arrayBuffer, dataOffset, dataSize);
-      console.log('parse name', name);
+      // console.log('parse name', name);
       const value = AmfParser.parseScript(arrayBuffer, dataOffset + name.size, dataSize - name.size);
-      console.log('parse value', value);
-
-      // data[name.data] = value.data;
-    // } catch(e) {
-      // console.log('AmfParser Error: ', e);
-    // }
+      // console.log('parse value', value);
+      
+      data[name.data] = value.data;
+      // 最终parse出来的metaData
+      console.log(data);
+    } catch(e) {
+      console.log('AmfParser Error: ', e);
+    }
   }
 
   static parseScript(arrayBuffer, dataOffset, dataSize) {
@@ -101,7 +103,7 @@ class AmfParser {
 
     const type = dv.getUint8(0); // 第一个byte表示AMFpacket的类型, (8位没有LE/BE概念)
 
-    console.log('type is :', type, "dataOffset is ", dataOffset);
+    // console.log('type is :', type, "dataOffset is ", dataOffset);
 
     let offset = 1; // 读取了类型:UI8, 一个byte
 
@@ -120,7 +122,7 @@ class AmfParser {
     * 11 = Date 
     * 12 = Long string
     */
-    // try {
+    try {
       switch (type) {
         case 0: {
           // 0 - Number: DOUBLE
@@ -267,9 +269,9 @@ class AmfParser {
           dataOffset = dataSize;
           console.log('AMF', 'Unsupported AMF value type: ', type);
       }
-    // } catch(e) {
-       // console.log('AmfParser Error:', e.toString());
-    // }
+    } catch(e) {
+       console.log('AmfParser Error:', e.toString());
+    }
     return {
       data: value,
       size: offset,
