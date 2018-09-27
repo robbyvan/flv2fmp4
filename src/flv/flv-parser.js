@@ -1,5 +1,6 @@
 import FlvPacket from './flv-packet';
 import AmfParser from './flv-amfParser';
+import FlvDemuxer from './flv-demux';
 
 class FlvParser {
   constructor() {
@@ -41,7 +42,10 @@ class FlvParser {
     const meta = this.arrPackets[0];
     const uint8Arr = new Uint8Array(meta.payload);
     const buffer = uint8Arr.buffer;
-    AmfParser.parseMetaData(buffer, 0, meta.payloadSize);
+    const dm = new FlvDemuxer();
+    // parse onMetaData
+    dm.parseMetaData(buffer, 0, meta.payloadSize);
+    // AmfParser.parseMetaData(buffer, 0, meta.payloadSize);
   }
 
   probe(buffer) {

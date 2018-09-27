@@ -36,9 +36,9 @@ class AmfParser {
       throw new IllegalStateException('Data not enough when parse ScriptDataObject');
     }
     const name = AmfParser.parseString(arrayBuffer, dataOffset, dataSize);
-    // console.log('key?', name);
+    console.log('key?', name);
     const value = AmfParser.parseScript(arrayBuffer, dataOffset + name.size, dataSize - name.size);
-    // console.log('value?', value);
+    console.log('value?', value);
     const isObjectEnd = value.objectEnd;
 
     return {
@@ -86,6 +86,7 @@ class AmfParser {
       data[name.data] = value.data;
       // 最终parse出来的metaData
       console.log(data);
+      return data;
     } catch(e) {
       console.log('AmfParser Error: ', e);
     }
@@ -248,9 +249,9 @@ class AmfParser {
 
         case 11: {
           // 11 - Date type: SCRIPTDATADATE = { DateTime: DOUBLE +  LocalDateTimeOffset: SI16 }
-          const date = AmfParser.parseDate(parseString, dataOffset + 1, dataSize - 1);
+          const date = AmfParser.parseDate(arrayBuffer, dataOffset + 1, dataSize - 1);
           value = date.data;
-          dataOffset += date.size;
+          offset += date.size;
 
           break;
         }
